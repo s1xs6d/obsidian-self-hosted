@@ -1,0 +1,19 @@
+{
+  "name": "obsidian-self-hosted",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "init": "bash scripts/init-obsidian.sh",
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/dev.mjs",
+    "lint": "npx @biomejs/biome check client/",
+    "lint:fix": "npx @biomejs/biome check --write --unsafe client/",
+    "format": "npx @biomejs/biome format --write client/",
+    "typecheck": "npx tsc --noEmit"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "esbuild": "^0.28.1",
+    "typescript": "^6.0.3"
+  }
+}
