@@ -1,10 +1,10 @@
 # OSH — Obsidian Self-Hosted
 
-> This is **not an official project** from Obsidian.
-> And also, It's not recommended to open external access.
+> This is **not an official project** from Obsidian.  
+> And also, It's not recommended to open external access.  
 > 
-> If you want to use it, **use it on your own lisk** and never open it to the internet.
-> Use VPN for external access or use only on the internal network.
+> If you want to use it, **use it on your own lisk** and never open it to the internet.  
+> Use VPN for external access or use only on the internal network.  
 
 Obsidian Self-Hosted(OSH) lets you run [Obsidian](https://obsidian.md) in a browser.
 
