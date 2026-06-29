@@ -38,9 +38,9 @@ services:
     ports:
       - "27123:27123"
     volumes:
-      - /path/to/your/notes:/vault
+      - /path/to/your/vaults:/vault # Not vault directory itself, use vault's parent directory to open other vaults in that directory.
     environment:
-      OSH_TOKEN: your-password # if this is empty, authentication will be disabled.
+      OSH_TOKEN: your-password # If this is empty, authentication will be disabled.
     restart: unless-stopped
 ```
 
