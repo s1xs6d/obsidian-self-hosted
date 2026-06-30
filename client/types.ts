@@ -195,6 +195,9 @@ declare global {
   // Make globalThis.process available (optional, may not exist in browser)
   // eslint-disable-next-line no-var
   var process: { platform: string; arch: string; env: Record<string, string | undefined>; versions: Record<string, string>; [key: string]: unknown } | undefined;
+  // Node.js global object polyfill
+  // eslint-disable-next-line no-var
+  var global: typeof globalThis;
 }
 
 export type ErrorWithCode = Error & { code?: string; path?: string; errno?: number };

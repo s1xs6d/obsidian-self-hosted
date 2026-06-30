@@ -8,7 +8,8 @@ import { buildFromTemplate } from "./remote/menu";
 const CSS = [
   ".sfb-modal{width:700px;max-width:92vw;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;}",
   ".sfb-modal .modal-title{text-align:left;}",
-  ".sfb-modal .modal-content{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:0;}",
+  ".sfb-modal .modal-content{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:0;min-height:0;}",
+  ".sfb-content{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;}",
   ".sfb-topbar{display:flex;align-items:center;gap:8px;padding:5px 10px;flex-shrink:0;border-bottom:1px solid var(--background-modifier-border);}",
   ".sfb-breadcrumb{flex:1;display:flex;flex-wrap:nowrap;align-items:center;overflow-x:auto;min-width:0;scrollbar-width:none;gap:0;}",
   ".sfb-breadcrumb::-webkit-scrollbar{display:none;}",
