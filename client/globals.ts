@@ -49,7 +49,8 @@ globalThis.close = () => {
   // If vault ID is unknown, stay on the current page.
 };
 
-// __dirname / __filename stubs expected by CommonJS-style code
+// Node.js globals expected by CommonJS-style plugins
+if (typeof globalThis.global === "undefined") globalThis.global = globalThis;
 if (typeof globalThis.__dirname === "undefined") globalThis.__dirname = "/";
 if (typeof globalThis.__filename === "undefined") globalThis.__filename = "/app.js";
 
