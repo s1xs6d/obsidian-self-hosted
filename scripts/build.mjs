@@ -1,6 +1,6 @@
 import { build } from 'esbuild';
 import { execSync } from 'child_process';
-import { cpSync, rmSync, writeFileSync, chmodSync, readFileSync } from 'fs';
+import { cpSync, rmSync, writeFileSync, chmodSync, readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { gzipSync } from 'zlib';
@@ -44,9 +44,24 @@ process.stdout.write('[3/3] Copying static assets... ');
 cpSync(staticDir, join(distDir, 'static'), { recursive: true });
 console.log('done');
 
+// Copy .env into dist/ with comments and blank lines stripped
+const envSrc = join(rootDir, '.env');
+if (existsSync(envSrc)) {
+  const stripped = readFileSync(envSrc, 'utf8')
+    .split('\n')
+    .filter(l => l.trim() && !l.trimStart().startsWith('#'))
+    .join('\n') + '\n';
+  writeFileSync(join(distDir, '.env'), stripped);
+}
+
 // Generate dist/run.sh
 writeFileSync(join(distDir, 'run.sh'), `#!/bin/sh
 DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$DIR/.env" ]; then
+  set -a
+  . "$DIR/.env"
+  set +a
+fi
 export GIN_MODE=release
 exec "$DIR/osh-server" \\
   --obsidian-dir="$DIR/static" \\
