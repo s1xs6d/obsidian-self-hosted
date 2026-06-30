@@ -68,12 +68,14 @@ func loginPage(next, errMsg string) []byte {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OSH</title>
+<title>Obsidian</title>
 <link rel="stylesheet" href="/app.css">
 <style>
 html,body{height:100%;margin:0}
 .modal-container{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:var(--layer-modal,100)}
-.modal-title{text-align:left}
+.modal-title{margin-left:0!important}
+.modal-content{padding-top:16px!important}
+.modal-content input[type=password]{width:100%;box-sizing:border-box}
 </style>
 </head>
 <body>
@@ -81,14 +83,11 @@ html,body{height:100%;margin:0}
 <div class="modal-container mod-dim">
 <div class="modal-bg"></div>
 <div class="modal" style="--dialog-width:360px;--dialog-max-width:92vw;--dialog-max-height:unset;position:relative">
-  <div class="modal-title">OSH</div>
+  <div class="modal-title">Sign in to continue</div>
   <form method="post" action="/auth/login">
     <input type="hidden" name="next" value="` + next + `">
     <div class="modal-content">
-      <div class="setting-item">
-        <div class="setting-item-description">Enter password to access your vault.</div>
-        <input type="password" name="password" autofocus autocomplete="current-password" placeholder="Password">
-      </div>` + errHTML + `
+      <input type="password" name="password" autofocus autocomplete="current-password" placeholder="Password">` + errHTML + `
     </div>
     <div class="modal-button-container">
       <button type="submit" class="mod-cta">Sign in</button>
