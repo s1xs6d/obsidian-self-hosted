@@ -31,8 +31,8 @@ func TokenAuth(token string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
 
-		// Skip auth for the login/logout routes themselves
-		if strings.HasPrefix(path, "/auth/") {
+		// Skip auth for the login/logout routes and assets needed to render the login page
+		if strings.HasPrefix(path, "/auth/") || path == "/app.css" {
 			c.Next()
 			return
 		}
