@@ -1,25 +1,48 @@
-import { getVaultId } from "./config";
+import { BASE_URL, getVaultId } from "./config";
 import { ipcSendSync } from "./ipc";
 import { warn } from "./log";
 import type { ObsidianMenu } from "./lib/obsidian-types";
 
-// Wrap window.eval to intercept the first plugin load and capture the Obsidian
-// public API (Menu, setIcon, etc.). Obsidian evaluates each plugin as:
+// Wrap window.eval to intercept every plugin load so we can:
+// 1. Capture the Obsidian public API (Menu, setIcon, etc.) once.
+// 2. Wrap Obsidian's internal `require` with a fallback to our globalThis.require
+//    shim for Node.js built-in modules that Obsidian's require doesn't handle
+//    in a browser context (e.g. "util", "child_process", "fs").
+//
+// Obsidian evaluates each plugin as:
 //   window.eval("(function anonymous(require,module,exports){…})")
-// and passes its internal `require` as the first arg, which returns the full API
-// when called with 'obsidian'. We wrap the result so we can intercept that call.
+// and passes its internal `require` as the first arg.
 (() => {
   const _realEval = window.eval;
   window.eval = (code) => {
     let result = _realEval.call(window, code);
-    if (!window.__oshObsAPI && typeof code === "string" && code.includes("(require,module,exports)")) {
+    if (typeof code === "string" && code.includes("(require,module,exports)") && typeof result === "function") {
       const _origFn = result;
       result = function (require, module, exports) {
+        // Capture Obsidian public API once.
         if (!window.__oshObsAPI && typeof require === "function") {
           try {
             const api = require("obsidian");
             if (api && typeof api.Menu === "function") window.__oshObsAPI = api;
           } catch (_) {}
+        }
+
+        // Wrap require: try Obsidian's internal require first; fall back to our
+        // shim for modules Obsidian doesn't know (Node built-ins, etc.).
+        const ourRequire = globalThis.require;
+        if (typeof require === "function" && typeof ourRequire === "function") {
+          const patchedRequire = (moduleName: string) => {
+            try {
+              const mod = require(moduleName);
+              return mod != null ? mod : ourRequire(moduleName);
+            } catch (_) {
+              return ourRequire(moduleName);
+            }
+          };
+          // Preserve require.resolve / require.cache that Obsidian's internal
+          // require exposes (some plugins read require.cache).
+          try { Object.assign(patchedRequire, require); } catch (_) {}
+          return _origFn.call(this, patchedRequire, module, exports);
         }
         return _origFn.call(this, require, module, exports);
       };
@@ -395,9 +418,82 @@ import type { ObsidianMenu } from "./lib/obsidian-types";
     // Poll until workspace exists before hooking onLayoutReady
     (function waitForWorkspace() {
       if (app.workspace && typeof app.workspace.onLayoutReady === "function") {
-        app.workspace.onLayoutReady(() => addRibbonButton(app));
+        app.workspace.onLayoutReady(() => {
+          // Patch WorkspaceLeaf.prototype.loadIfDeferred so it waits when
+          // leaf.working = true (setViewState still in progress) instead of
+          // bailing out and resolving immediately with an unloaded eD view.
+          //
+          // Root cause of the wait: our async FS makes setViewState slower
+          // than Electron's sync I/O, so non-visible leaves (e.g. a hidden
+          // file-explorer sidebar) can still be mid-setViewState when
+          // onLayoutReady fires. eD.rerender() exits early on working=true,
+          // leaving leaf.view as the deferred stub with no fileItems. Plugins
+          // like obsidian-icon-folder then throw "Cannot read properties of
+          // undefined (reading 'settings')" when iterating fileItems.
+          const anyLeaf =
+            (app.workspace as { activeLeaf?: unknown }).activeLeaf ??
+            app.workspace.getLeavesOfType("file-explorer")[0] ??
+            null;
+          if (anyLeaf) {
+            const proto = Object.getPrototypeOf(anyLeaf) as Record<string, unknown>;
+            if (proto && typeof proto.loadIfDeferred === "function" && !proto.__oshLidPatch) {
+              const _origLid = proto.loadIfDeferred as () => Promise<void>;
+              proto.loadIfDeferred = function (this: { working: boolean }) {
+                if (!this.working) return _origLid.call(this);
+                const self = this;
+                return new Promise<void>((resolve) => {
+                  const poll = () => {
+                    if (!self.working) (_origLid.call(self) as Promise<void>).then(() => resolve(), () => resolve());
+                    else setTimeout(poll, 16);
+                  };
+                  setTimeout(poll, 16);
+                });
+              };
+              proto.__oshLidPatch = true;
+            }
+          }
+          addRibbonButton(app);
+        });
       } else {
         setTimeout(waitForWorkspace, 50);
+      }
+    })();
+
+    // Poll until the community-plugins manager is available, then register a
+    // beforeunload handler that writes the current enabledPlugins set via
+    // sendBeacon. This guarantees persistence even when the user refreshes
+    // within the 1-second requestSaveConfig debounce window: sendBeacon
+    // completes in the background regardless of page navigation.
+    (function waitForPlugins() {
+      const pm = app.plugins as {
+        enabledPlugins?: Set<string>;
+        saveConfig?: () => Promise<void>;
+        requestSaveConfig?: { run?: () => void };
+      } | undefined;
+      if (pm && pm.enabledPlugins instanceof Set && typeof pm.saveConfig === "function") {
+        window.addEventListener("beforeunload", () => {
+          const vaultId = getVaultId();
+          if (!vaultId) return;
+          const adapter = (app.vault as { adapter?: { basePath?: string } } | undefined)?.adapter;
+          const basePath = adapter?.basePath;
+          const configDir =
+            (app.vault as { configDir?: string } | undefined)?.configDir || ".obsidian";
+          if (!basePath) return;
+          const filePath = basePath + "/" + configDir + "/community-plugins.json";
+          const list = Array.from(pm.enabledPlugins as Set<string>);
+          const payload = JSON.stringify({
+            path: filePath,
+            data: JSON.stringify(list, null, 2),
+            encoding: "utf8",
+            flag: "w",
+          });
+          navigator.sendBeacon(
+            BASE_URL + "/api/fs/writeFile?vault=" + encodeURIComponent(vaultId),
+            new Blob([payload], { type: "application/json" }),
+          );
+        });
+      } else {
+        setTimeout(waitForPlugins, 50);
       }
     })();
   }

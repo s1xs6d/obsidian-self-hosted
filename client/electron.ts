@@ -194,22 +194,42 @@ globalThis.require = (moduleName: string): unknown => {
       mod = fsShim;
       break;
     case "fs/promises": {
-      // fs/promises.watch(path, opts) returns an AsyncIterable<{filename, eventType}>.
-      // We have no server-side file-event stream, so we yield nothing and wait
-      // for the AbortSignal — the plugin handles the abort error gracefully.
-      const fsWatch = async function* (
+      // fs/promises.watch returns an AsyncIterable. We have no real file-event
+      // stream, so the iterator yields nothing. When the caller's AbortSignal
+      // fires we resolve the pending next() with done:true — cleanly ending the
+      // for-await loop without throwing, so plugins don't see an AbortError.
+      const fsWatch = (
         _path: string,
         opts?: { signal?: AbortSignal; recursive?: boolean },
-      ) {
-        await new Promise<void>((_resolve, reject) => {
-          if (opts?.signal?.aborted) { reject(new Error("AbortError")); return; }
-          opts?.signal?.addEventListener("abort", () => reject(new Error("AbortError")));
-        });
+      ) => {
+        const signal = opts?.signal;
+        return {
+          [Symbol.asyncIterator]() {
+            let done = false;
+            let pending: (() => void) | null = null;
+            const onAbort = () => { done = true; pending?.(); };
+            if (signal) {
+              if (signal.aborted) done = true;
+              else signal.addEventListener("abort", onAbort, { once: true });
+            }
+            return {
+              next(): Promise<{ value: undefined; done: boolean }> {
+                if (done) return Promise.resolve({ value: undefined, done: true });
+                return new Promise((res) => { pending = () => res({ value: undefined, done: true }); });
+              },
+              return(): Promise<{ value: undefined; done: true }> {
+                done = true;
+                pending?.();
+                if (signal) signal.removeEventListener("abort", onAbort);
+                return Promise.resolve({ value: undefined, done: true as const });
+              },
+            };
+          },
+        };
       };
-      mod = {
-        ...fsShim,
-        watch: fsWatch,
-      };
+      // Spread fsShim.promises (promise-based API with rm, stat, readFile, …)
+      // rather than fsShim (callback-based) so rm() and friends are available.
+      mod = { ...fsShim.promises, watch: fsWatch };
       break;
     }
     case "os":

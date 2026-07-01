@@ -26,7 +26,12 @@ proc.env.NODE_ENV = proc.env.NODE_ENV || "production";
 proc.versions = Object.assign(
   {
     electron: "28.2.3",
-    node: "18.18.2",
+    // Deliberately no "node" entry: we fake Electron but not Node.js.
+    // Setting process.versions.node causes Emscripten-based WASM plugins
+    // (e.g. make-md / sql.js) to enter Node.js mode, use __dirname
+    // (undefined in the browser) for base paths, and corrupt their
+    // internal MEMFS paths — surfacing as uncaught ENOTSUP (errno 44).
+    // Obsidian itself never reads process.versions.node (0 refs in app.js).
     chrome: "120.0.6099.291",
     v8: "12.0.267.19-electron.0",
     uv: "1.46.0",
