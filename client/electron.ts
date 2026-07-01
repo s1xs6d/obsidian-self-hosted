@@ -1,3 +1,4 @@
+import { childProcessShim } from "./child_process";
 import { fsShim } from "./fs/index";
 import { ipcRenderer } from "./ipc";
 import { EventEmitter } from "./lib/event-emitter";
@@ -177,9 +178,11 @@ function _emptyImage(): NativeImage {
 const _moduleCache: Record<string, unknown> = {};
 
 globalThis.require = (moduleName: string): unknown => {
-  if (_moduleCache[moduleName]) return _moduleCache[moduleName];
+  // Normalise "node:foo" → "foo" so all node: built-ins hit the same cases below.
+  const name = moduleName.startsWith("node:") ? moduleName.slice(5) : moduleName;
+  if (_moduleCache[name]) return _moduleCache[name];
   let mod;
-  switch (moduleName) {
+  switch (name) {
     case "electron":
       mod = electronShim;
       break;
@@ -190,6 +193,25 @@ globalThis.require = (moduleName: string): unknown => {
     case "original-fs":
       mod = fsShim;
       break;
+    case "fs/promises": {
+      // fs/promises.watch(path, opts) returns an AsyncIterable<{filename, eventType}>.
+      // We have no server-side file-event stream, so we yield nothing and wait
+      // for the AbortSignal — the plugin handles the abort error gracefully.
+      const fsWatch = async function* (
+        _path: string,
+        opts?: { signal?: AbortSignal; recursive?: boolean },
+      ) {
+        await new Promise<void>((_resolve, reject) => {
+          if (opts?.signal?.aborted) { reject(new Error("AbortError")); return; }
+          opts?.signal?.addEventListener("abort", () => reject(new Error("AbortError")));
+        });
+      };
+      mod = {
+        ...fsShim,
+        watch: fsWatch,
+      };
+      break;
+    }
     case "os":
       mod = osShim;
       break;
@@ -382,6 +404,26 @@ globalThis.require = (moduleName: string): unknown => {
       mod = { Stream, Readable, Writable, Transform, PassThrough, pipeline };
       break;
     }
+    case "util": {
+      mod = {
+        isDeepStrictEqual: (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b),
+        promisify: (fn: (...args: unknown[]) => void) => (...args: unknown[]) =>
+          new Promise((resolve, reject) =>
+            fn(...args, (err: unknown, result: unknown) => (err ? reject(err) : resolve(result)))
+          ),
+        inspect: (v: unknown) => JSON.stringify(v),
+        format: (...args: unknown[]) => args.map((a) => (typeof a === "string" ? a : JSON.stringify(a))).join(" "),
+        inherits: (ctor: { prototype: unknown }, superCtor: { prototype: object }) => {
+          ctor.prototype = Object.create(superCtor.prototype, { constructor: { value: ctor } });
+        },
+        deprecate: (fn: unknown) => fn,
+        types: {
+          isNativeError: (v: unknown) => v instanceof Error,
+          isRegExp: (v: unknown) => v instanceof RegExp,
+        },
+      };
+      break;
+    }
     case "assert": {
       const assert = (val, msg) => {
         if (!val) throw new Error(msg || "Assertion failed");
@@ -410,6 +452,10 @@ globalThis.require = (moduleName: string): unknown => {
       mod = assert;
       break;
     }
+    case "child_process": {
+      mod = childProcessShim;
+      break;
+    }
     default: {
       // Fall back to window globals for browser libs loaded via <script>
       const candidates = [
@@ -431,7 +477,7 @@ globalThis.require = (moduleName: string): unknown => {
       }
     }
   }
-  _moduleCache[moduleName] = mod;
+  _moduleCache[name] = mod;
   return mod;
 };
 

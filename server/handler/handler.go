@@ -7,7 +7,7 @@ import (
 )
 
 // RegisterRoutes registers all HTTP routes on the given Gin engine.
-func RegisterRoutes(r *gin.Engine, staticHandler *StaticHandler, hub http.Handler, fsHub http.Handler) {
+func RegisterRoutes(r *gin.Engine, staticHandler *StaticHandler, hub http.Handler, fsHub http.Handler, execHub http.Handler) {
 	// ---- Auth ----
 	r.GET("/auth/login", AuthLoginGet)
 	r.POST("/auth/login", AuthLoginPost)
@@ -80,6 +80,7 @@ func RegisterRoutes(r *gin.Engine, staticHandler *StaticHandler, hub http.Handle
 	// ---- WebSocket (wrapped with gin.WrapH so the existing http.Handler works) ----
 	r.GET("/ws", gin.WrapH(hub))
 	r.GET("/ws-fs", gin.WrapH(fsHub))
+	r.GET("/exec/ws", gin.WrapH(execHub))
 
 	// ---- Dev live-reload (debug mode only, never active in production) ----
 	if gin.Mode() != gin.ReleaseMode {

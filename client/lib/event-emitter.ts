@@ -20,6 +20,10 @@ export class EventEmitter {
     return this.on(e, w);
   }
 
+  off(e: string, cb: (...args: unknown[]) => void): this {
+    return this.removeListener(e, cb);
+  }
+
   removeListener(e: string, cb: (...args: unknown[]) => void): this {
     if (!this._events[e]) return this;
     this._events[e] = this._events[e].filter(

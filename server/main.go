@@ -44,6 +44,7 @@ func main() {
 	handler.InitSecretStore()
 
 	fsHub := ws.NewWSFSHub()
+	execHub := ws.NewExecHub()
 
 	staticHandler := handler.NewStaticHandler(*obsidianDir, *staticDir)
 
@@ -53,7 +54,7 @@ func main() {
 	r.Use(gin.Recovery())
 	r.Use(middleware.TokenAuth(oshToken))
 
-	handler.RegisterRoutes(r, staticHandler, hub, fsHub)
+	handler.RegisterRoutes(r, staticHandler, hub, fsHub, execHub)
 	handler.SetDispatchEngine(r)
 
 	log.Printf("OSH server listening on %s", *addr)
