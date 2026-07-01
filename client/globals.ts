@@ -54,6 +54,15 @@ if (typeof globalThis.global === "undefined") globalThis.global = globalThis;
 if (typeof globalThis.__dirname === "undefined") globalThis.__dirname = "/";
 if (typeof globalThis.__filename === "undefined") globalThis.__filename = "/app.js";
 
+// Browsers return CSS custom property values with surrounding whitespace, e.g. " #1e1e2e".
+// Obsidian's Color parser does not trim, so it returns undefined for non-empty but
+// whitespace-padded values — causing plugins like Excalidraw to crash on `.alphaTo()`.
+const _origGetPropertyValue = CSSStyleDeclaration.prototype.getPropertyValue;
+CSSStyleDeclaration.prototype.getPropertyValue = function (prop: string) {
+  const val = _origGetPropertyValue.call(this, prop);
+  return prop.startsWith("--") ? val.trim() : val;
+};
+
 // NOTE: Do NOT define window.module or window.exports globally.
 // Browser UMD bundles check `typeof module !== 'undefined'` to choose between
 // CommonJS and browser-global mode — a fake global.module breaks them.
