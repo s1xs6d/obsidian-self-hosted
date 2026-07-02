@@ -385,6 +385,21 @@ import type { ObsidianMenu } from "./lib/obsidian-types";
     if (typeof app.loadLocalStorage !== "function") return;
     app.__oshLsPatch = true;
 
+    // Obsidian's FileSystemAdapter.queue() races each FS op against a kill-
+    // Promise whose reject is stored as killLastAction. When the real op wins
+    // (normal case), the kill-Promise is left pending with no rejection handler.
+    // After 60 s of FS inactivity the 6e4-ms debounce fires adapter.kill(),
+    // rejecting that orphaned Promise → "File system operation timed out."
+    // In OSH, vault loading finishes and goes quiet, reliably triggering this.
+    // Native Electron masks it because ongoing user edits keep resetting the
+    // timer. The error is always a false alarm (the real op already succeeded),
+    // so we suppress it here.
+    window.addEventListener("unhandledrejection", (ev) => {
+      if ((ev.reason as Error | null)?.message === "File system operation timed out.") {
+        ev.preventDefault();
+      }
+    });
+
     const _origLoad = app.loadLocalStorage.bind(app);
     const _origSave = app.saveLocalStorage.bind(app);
 
@@ -418,42 +433,33 @@ import type { ObsidianMenu } from "./lib/obsidian-types";
     // Poll until workspace exists before hooking onLayoutReady
     (function waitForWorkspace() {
       if (app.workspace && typeof app.workspace.onLayoutReady === "function") {
-        app.workspace.onLayoutReady(() => {
-          // Patch WorkspaceLeaf.prototype.loadIfDeferred so it waits when
-          // leaf.working = true (setViewState still in progress) instead of
-          // bailing out and resolving immediately with an unloaded eD view.
-          //
-          // Root cause of the wait: our async FS makes setViewState slower
-          // than Electron's sync I/O, so non-visible leaves (e.g. a hidden
-          // file-explorer sidebar) can still be mid-setViewState when
-          // onLayoutReady fires. eD.rerender() exits early on working=true,
-          // leaving leaf.view as the deferred stub with no fileItems. Plugins
-          // like obsidian-icon-folder then throw "Cannot read properties of
-          // undefined (reading 'settings')" when iterating fileItems.
-          const anyLeaf =
-            (app.workspace as { activeLeaf?: unknown }).activeLeaf ??
-            app.workspace.getLeavesOfType("file-explorer")[0] ??
-            null;
-          if (anyLeaf) {
-            const proto = Object.getPrototypeOf(anyLeaf) as Record<string, unknown>;
-            if (proto && typeof proto.loadIfDeferred === "function" && !proto.__oshLidPatch) {
-              const _origLid = proto.loadIfDeferred as () => Promise<void>;
-              proto.loadIfDeferred = function (this: { working: boolean }) {
-                if (!this.working) return _origLid.call(this);
-                const self = this;
-                return new Promise<void>((resolve) => {
-                  const poll = () => {
-                    if (!self.working) (_origLid.call(self) as Promise<void>).then(() => resolve(), () => resolve());
-                    else setTimeout(poll, 16);
-                  };
-                  setTimeout(poll, 16);
-                });
-              };
-              proto.__oshLidPatch = true;
+        // Intercept getLeavesOfType so that *every* call for 'file-explorer'
+        // leaves ensures the view has fileItems initialised before the caller
+        // sees it. Doing this once in onLayoutReady is not enough: the plugin's
+        // addAll() calls getLeavesOfType independently, and the view may still
+        // be an eD deferred stub (fileItems === undefined) at that moment.
+        //
+        // eD stubs have no fileItems property; when obsidian-icon-folder's
+        // setIcons iterates Object.entries(plugin.data) — which includes a
+        // "settings" key — it evaluates fileExplorer.view.fileItems["settings"]
+        // on an undefined fileItems → "Cannot read properties of undefined
+        // (reading 'settings')". Setting fileItems={} on the stub turns the
+        // access into a no-op undefined lookup rather than a TypeError.
+        if (!(app.workspace as { __oshGlotPatch?: boolean }).__oshGlotPatch) {
+          (app.workspace as { __oshGlotPatch?: boolean }).__oshGlotPatch = true;
+          const _origGlot = app.workspace.getLeavesOfType.bind(app.workspace) as (t: string) => { view?: { fileItems?: unknown } }[];
+          (app.workspace as { getLeavesOfType: (t: string) => unknown[] }).getLeavesOfType = function (type: string) {
+            const leaves = _origGlot(type);
+            if (type === "file-explorer") {
+              for (const leaf of leaves) {
+                if (leaf.view && leaf.view.fileItems === undefined) leaf.view.fileItems = {};
+              }
             }
-          }
-          addRibbonButton(app);
-        });
+            return leaves;
+          };
+        }
+
+        app.workspace.onLayoutReady(() => addRibbonButton(app));
       } else {
         setTimeout(waitForWorkspace, 50);
       }
