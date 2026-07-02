@@ -11,6 +11,8 @@ const staticDir = join(rootDir, 'static');
 const serverDir = join(rootDir, 'server');
 const distDir   = join(rootDir, 'dist');
 
+const { version } = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf8'));
+
 console.log('==> osh build\n');
 
 // 1. Build client shim
@@ -27,6 +29,7 @@ await build({
   legalComments: 'none',
   sourcemap:     false,
   logLevel:      'silent',
+  define:        { __OSH_VERSION__: JSON.stringify(version) },
 });
 const shimRaw  = readFileSync(join(staticDir, 'electron-shim.js'));
 const shimGzip = gzipSync(shimRaw);

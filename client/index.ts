@@ -1,3 +1,6 @@
+declare const __OSH_VERSION__: string;
+console.log(`Running with Obsidian-Self-Hosted (v${__OSH_VERSION__})`);
+
 // Polyfills must come first — other modules may need them at import time.
 import "./crypto";
 import "./buffer";
