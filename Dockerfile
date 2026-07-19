@@ -44,10 +44,26 @@ FROM debian:bookworm-slim
 # unless told otherwise. Baking this into the image (root's own, isolated
 # $HOME — not a real user's machine) covers every git invocation, including
 # ones the app's own -c safe.directory=* flag might miss (see server/ws/exec.go).
+#
+# credential.helper=store: without a helper, git can only get credentials by
+# prompting a tty — fine in the OSH terminal, but the Git plugin's non-pty
+# child_process calls have no tty to prompt on and just fail. `store` caches
+# whatever's entered once (e.g. via the OSH terminal) in ~/.git-credentials
+# (plaintext — persisted via the osh-home:/root volume, see README) so later
+# non-interactive invocations don't need to prompt at all.
+#
+# core.pager=cat: git usually detects a non-tty stdout and skips paging on
+# its own, but that's a heuristic, not a guarantee — if it ever mispredicts on
+# the plugin's pipe-based (no-tty) path, `less` would block forever waiting
+# for input that can never arrive, hanging that WS connection. Belt-and-
+# suspenders. (The interactive OSH terminal still has a real pty, so `less`
+# there works fine if invoked explicitly, e.g. `git -c core.pager=less log`.)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates git \
     && rm -rf /var/lib/apt/lists/* \
-    && git config --global --add safe.directory '*'
+    && git config --global --add safe.directory '*' \
+    && git config --global credential.helper store \
+    && git config --global core.pager ""
 
 WORKDIR /app
 

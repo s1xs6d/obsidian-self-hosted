@@ -39,12 +39,18 @@ services:
       - "27123:27123"
     volumes:
       - /path/to/your/vaults:/vault # Not vault directory itself, use vault's parent directory to open other vaults in that directory.
+      - osh-home:/root # Persists the registered-vault list, saved secrets, and git config/credentials across container recreation.
     environment:
       OSH_TOKEN: your-password # If this is empty, authentication will be disabled.
     restart: unless-stopped
+
+volumes:
+  osh-home:
 ```
 
 Open `http://your-server:27123` and sign in with the password you set.
+
+Without the `osh-home` volume, the container runs as root with an ephemeral `/root`: OSH's vault registry, saved secrets, and anything written to `~/.gitconfig` / `~/.git-credentials` (e.g. via the terminal, if `OSH_TERMINAL=true`) all disappear the next time the container is recreated (`docker compose up` after a `down` or image update — not a plain restart).
 
 ## Code Structure
 
