@@ -29,6 +29,7 @@ await build({
   legalComments: 'none',
   sourcemap:     false,
   logLevel:      'silent',
+  loader:        { '.css': 'text' },
   define:        { __OSH_VERSION__: JSON.stringify(version) },
 });
 const shimRaw  = readFileSync(join(staticDir, 'electron-shim.js'));

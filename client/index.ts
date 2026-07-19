@@ -24,6 +24,7 @@ import "./fs";
 
 // UI
 import "./file-browser";
+import "./terminal";
 import "./vault-detect";
 import "./fake-window";
 import "./remote/index";

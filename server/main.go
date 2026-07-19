@@ -44,7 +44,8 @@ func main() {
 	handler.InitSecretStore()
 
 	fsHub := ws.NewWSFSHub()
-	execHub := ws.NewExecHub()
+	terminalEnabled := os.Getenv("OSH_TERMINAL") == "true"
+	execHub := ws.NewExecHub(terminalEnabled)
 
 	staticHandler := handler.NewStaticHandler(*obsidianDir, *staticDir)
 

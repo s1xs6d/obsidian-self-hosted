@@ -31,8 +31,11 @@ func TokenAuth(token string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
 
-		// Skip auth for the login/logout routes and assets needed to render the login page
-		if strings.HasPrefix(path, "/auth/") || path == "/app.css" {
+		// Skip auth for the login/logout routes and assets needed to render the login page.
+		// /dev/* (only ever registered outside gin.ReleaseMode — never in production
+		// builds) is exempt too: the dev script's own reload-trigger POST is a
+		// same-machine, cookie-less request from esbuild's watch process, not a browser.
+		if strings.HasPrefix(path, "/auth/") || path == "/app.css" || strings.HasPrefix(path, "/dev/") {
 			c.Next()
 			return
 		}
@@ -58,8 +61,7 @@ func TokenAuth(token string) gin.HandlerFunc {
 		isAPI := strings.HasPrefix(path, "/api/") ||
 			strings.HasPrefix(path, "/ipc/") ||
 			strings.HasPrefix(path, "/ws") ||
-			strings.HasPrefix(path, "/vault-files/") ||
-			strings.HasPrefix(path, "/dev/")
+			strings.HasPrefix(path, "/vault-files/")
 		if isAPI {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return

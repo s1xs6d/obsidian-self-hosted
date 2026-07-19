@@ -2,6 +2,7 @@ import { BASE_URL, getVaultId } from "./config";
 import { ipcSendSync } from "./ipc";
 import { warn } from "./log";
 import type { ObsidianMenu } from "./lib/obsidian-types";
+import { openTerminal } from "./terminal";
 
 // Wrap window.eval to intercept every plugin load so we can:
 // 1. Capture the Obsidian public API (Menu, setIcon, etc.) once.
@@ -211,6 +212,17 @@ import type { ObsidianMenu } from "./lib/obsidian-types";
     if (api && typeof api.setIcon === "function") api.setIcon(el, icon);
   }
 
+  function withOshSections(sections) {
+    if (!window.__oshTerminal) return sections;
+    return sections.concat([
+      {
+        label: "OSH",
+        icon: "terminal",
+        items: [{ cmd: "osh:open-terminal", label: "Open terminal", icon: "terminal" }],
+      },
+    ]);
+  }
+
   function buildMenuStructure(app) {
     const mgr = app?.appMenuBarManager;
     let template = null;
@@ -251,18 +263,20 @@ import type { ObsidianMenu } from "./lib/obsidian-types";
         while (items.length && items[items.length - 1] === null) items.pop();
         if (items.length) sections.push({ label, icon: SECTION_ICON[label] || "", items });
       });
-      if (sections.length) return sections;
+      if (sections.length) return withOshSections(sections);
     }
 
     const cmds = app?.commands?.commands || {};
-    return FALLBACK_SECTIONS.map((s) => ({
-      label: s.label,
-      icon: SECTION_ICON[s.label] || "",
-      items: s.items.map((id) => {
-        if (!id) return null;
-        return { cmd: id, label: cmds[id]?.name || id, icon: CMD_ICON[id] || "" };
-      }),
-    }));
+    return withOshSections(
+      FALLBACK_SECTIONS.map((s) => ({
+        label: s.label,
+        icon: SECTION_ICON[s.label] || "",
+        items: s.items.map((id) => {
+          if (!id) return null;
+          return { cmd: id, label: cmds[id]?.name || id, icon: CMD_ICON[id] || "" };
+        }),
+      })),
+    );
   }
 
   function showObsidianMenu(app, triggerEvt) {
@@ -380,6 +394,24 @@ import type { ObsidianMenu } from "./lib/obsidian-types";
     }
   }
 
+  // Registers "Open terminal" as a real Obsidian command (not a ribbon icon)
+  // so it shows up as an entry in the Menu button's dropdown — via
+  // buildMenuStructure's "osh:open-terminal" reference — and, as a bonus,
+  // in the command palette and hotkey settings like any other command.
+  function registerTerminalCommand(app) {
+    if (!window.__oshTerminal) return;
+    try {
+      app.commands.addCommand({
+        id: "osh:open-terminal",
+        name: "Open terminal",
+        icon: "terminal",
+        callback: () => openTerminal(),
+      });
+    } catch (e) {
+      warn("osh: failed to register terminal command: " + e);
+    }
+  }
+
   function patchApp(app) {
     if (!app || app.__oshLsPatch) return;
     if (typeof app.loadLocalStorage !== "function") return;
@@ -459,7 +491,10 @@ import type { ObsidianMenu } from "./lib/obsidian-types";
           };
         }
 
-        app.workspace.onLayoutReady(() => addRibbonButton(app));
+        app.workspace.onLayoutReady(() => {
+          registerTerminalCommand(app);
+          addRibbonButton(app);
+        });
       } else {
         setTimeout(waitForWorkspace, 50);
       }

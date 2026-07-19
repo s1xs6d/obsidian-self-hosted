@@ -59,6 +59,8 @@ ENV OSH_ADDR=:27123
 # /vault is the conventional mount point for the notes folder.
 # Override with OSH_HOME=/ to disable path restrictions entirely.
 ENV OSH_HOME=/vault
+# Set OSH_TERMINAL=true to enable the terminal modal (experimental)
+# ENV OSH_TERMINAL=true
 
 EXPOSE 27123
 

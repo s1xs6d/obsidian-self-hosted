@@ -128,6 +128,7 @@ func (h *StaticHandler) ServeObsidianFile(c *gin.Context) {
 		}
 		data = injectShims(data)
 		data = injectFavicon(data)
+		data = injectTerminalFlag(data)
 		setSecurityHeaders(c)
 		c.Header("Content-Type", "text/html; charset=utf-8")
 		c.Header("Cache-Control", "no-cache")
@@ -159,6 +160,7 @@ func (h *StaticHandler) serveObsidianHTML(c *gin.Context, filename string) {
 	data = injectShims(data)
 	data = injectFavicon(data)
 	data = injectDevReload(data)
+	data = injectTerminalFlag(data)
 	data = relaxCSP(data)
 	setSecurityHeaders(c)
 	c.Header("Content-Type", "text/html; charset=utf-8")
@@ -305,6 +307,18 @@ func injectDevReload(html []byte) []byte {
 	lower := bytes.ToLower(html)
 	if pos := findTagClose(lower, []byte("<head")); pos >= 0 {
 		return spliceAt(html, pos, []byte(devReloadTag))
+	}
+	return html
+}
+
+func injectTerminalFlag(html []byte) []byte {
+	tag := []byte("\n<script>window.__oshTerminal=false;</script>\n")
+	if os.Getenv("OSH_TERMINAL") == "true" {
+		tag = []byte("\n<script>window.__oshTerminal=true;</script>\n")
+	}
+	lower := bytes.ToLower(html)
+	if pos := findTagClose(lower, []byte("<head")); pos >= 0 {
+		return spliceAt(html, pos, tag)
 	}
 	return html
 }

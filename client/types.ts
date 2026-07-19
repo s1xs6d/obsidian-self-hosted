@@ -177,6 +177,8 @@ declare global {
     __oshConnBound?: boolean;
     __oshConnHide?: () => void;
     __oshConnSchedule?: () => void;
+    __oshTerminal?: boolean;
+    __oshTermState?: Record<string, unknown>;
     __oshReady?: boolean;
     electron?: Record<string, unknown>;
     ipcRenderer?: Record<string, unknown>;

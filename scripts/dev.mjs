@@ -1,6 +1,6 @@
 import { context } from 'esbuild';
 import { spawn } from 'child_process';
-import { watch, readFileSync } from 'fs';
+import { watch, readFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -9,6 +9,23 @@ const rootDir = join(__dirname, '..');
 const { version } = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf8'));
 const DEV_TRIGGER = 'http://localhost:27123/dev/reload-trigger';
 const DEV_PING    = 'http://localhost:27123/dev/ping';
+
+// Load .env file from project root into process.env
+const envPath = join(rootDir, '.env');
+if (existsSync(envPath)) {
+  const lines = readFileSync(envPath, 'utf8').split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const val = trimmed.slice(eqIdx + 1).trim();
+    if (key && !process.env[key]) {
+      process.env[key] = val;
+    }
+  }
+}
 
 let goProc      = null;
 let goRestart   = false; // true while Go is in the middle of restarting
@@ -29,6 +46,7 @@ const ctx = await context({
   sourcemap:   false,
   logLevel:    'info',
   define:      { __OSH_VERSION__: JSON.stringify(version) },
+  loader:      { '.css': 'text' },
   plugins: [{
     name: 'dev-reload',
     setup(build) {
@@ -68,6 +86,12 @@ function startGoServer() {
       cwd: join(rootDir, 'server'),
       stdio: 'inherit',
       env: { ...process.env, GIN_MODE: 'debug' },
+      // `go run` forks the actual compiled binary as a child of this process;
+      // SIGTERM sent to just this PID only reaches the `go run` wrapper; the
+      // relay to its child is not reliable, so the compiled binary can survive
+      // and keep the port. `detached: true` puts both in their own process
+      // group so killGoServer() below can signal the whole group at once.
+      detached: true,
     },
   );
   proc.on('exit', (code, signal) => {
@@ -80,12 +104,23 @@ function startGoServer() {
   goProc = proc;
 }
 
+// Signals the whole process group (`go run` wrapper + the compiled binary it
+// forked), not just the wrapper — see the `detached` comment in startGoServer.
+function killGoServer(signal) {
+  if (!goProc) return;
+  try {
+    process.kill(-goProc.pid, signal);
+  } catch (_) {
+    // Group already gone.
+  }
+}
+
 function restartGoServer() {
   if (goRestart) return;
   goRestart = true;
   console.log('[osh] Server source changed → restarting Go server');
   if (goProc) {
-    goProc.kill('SIGTERM');
+    killGoServer('SIGTERM');
     goProc = null;
   }
   // Give the process a moment to exit before spawning a new one.
@@ -111,7 +146,7 @@ console.log('[osh] Watching server/ for Go changes');
 process.on('SIGINT', () => {
   console.log('\n[osh] Shutting down...');
   ctx.dispose();
-  if (goProc) goProc.kill('SIGTERM');
+  killGoServer('SIGTERM');
   process.exit(0);
 });
 

@@ -1,15 +1,17 @@
-let _cssInjected = false;
+// Keyed by CSS content so unrelated modules (file browser, terminal, ...) can
+// each inject their own stylesheet once without clobbering one another.
+const _injectedCSS = new Set<string>();
 
 export function injectCSS(css) {
-  if (_cssInjected) return;
-  _cssInjected = true;
+  if (_injectedCSS.has(css)) return;
+  _injectedCSS.add(css);
   const s = document.createElement("style");
   s.textContent = css;
   document.head.appendChild(s);
 }
 
 export function resetCSSInjection() {
-  _cssInjected = false;
+  _injectedCSS.clear();
 }
 
 export function esc(str) {
