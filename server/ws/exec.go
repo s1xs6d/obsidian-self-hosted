@@ -88,7 +88,9 @@ func (h *ExecHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	cmd := exec.Command("git", req.Args...) //nolint:gosec
+	safeDirArgs := []string{"-c", "safe.directory=*"}
+	gitArgs := append(safeDirArgs, req.Args...)
+	cmd := exec.Command("git", gitArgs...) //nolint:gosec
 	if req.Cwd != "" {
 		cmd.Dir = req.Cwd
 	}
