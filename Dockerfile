@@ -39,9 +39,15 @@ RUN npm run build
 # ── Stage 2: runtime ────────────────────────────────────────────────────────
 FROM debian:bookworm-slim
 
+# The container always runs as root, and /vault is a bind-mounted host
+# directory git doesn't own — git refuses to touch it ("dubious ownership")
+# unless told otherwise. Baking this into the image (root's own, isolated
+# $HOME — not a real user's machine) covers every git invocation, including
+# ones the app's own -c safe.directory=* flag might miss (see server/ws/exec.go).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates git \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && git config --global --add safe.directory '*'
 
 WORKDIR /app
 

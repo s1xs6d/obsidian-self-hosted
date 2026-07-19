@@ -119,19 +119,16 @@ func (h *ExecHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// git's "dubious ownership" check (bind-mounted vault dir owned by a
+	// different uid than the container's root) is handled once, globally, in
+	// the Dockerfile via `git config --global --add safe.directory '*'` —
+	// not here, so this doesn't have to be duplicated across every git
+	// invocation path. Local/bare-metal runs are on their own for this.
 	var cmd *exec.Cmd
 	if h.TerminalEnabled && req.Cmd != "git" {
 		cmd = exec.Command(req.Cmd, req.Args...) //nolint:gosec
 	} else {
-		// Either terminal mode is off (only git is allowed at all, forced above)
-		// or the caller explicitly asked to run git — either way, prepend
-		// safe.directory=* so git doesn't refuse to operate on a bind-mounted
-		// vault directory it doesn't own (common in Docker deployments). Without
-		// this, turning terminal mode on silently drops the workaround for any
-		// git command, including the ones the Git plugin issues on its own.
-		safeDirArgs := []string{"-c", "safe.directory=*"}
-		allArgs := append(safeDirArgs, req.Args...)
-		cmd = exec.Command("git", allArgs...) //nolint:gosec
+		cmd = exec.Command("git", req.Args...) //nolint:gosec
 	}
 	if req.Cwd != "" {
 		cmd.Dir = req.Cwd
