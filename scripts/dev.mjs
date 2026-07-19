@@ -1,11 +1,12 @@
 import { context } from 'esbuild';
 import { spawn } from 'child_process';
-import { watch } from 'fs';
+import { watch, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = join(__dirname, '..');
+const { version } = JSON.parse(readFileSync(join(rootDir, 'package.json'), 'utf8'));
 const DEV_TRIGGER = 'http://localhost:27123/dev/reload-trigger';
 const DEV_PING    = 'http://localhost:27123/dev/ping';
 
@@ -27,6 +28,7 @@ const ctx = await context({
   legalComments: 'none',
   sourcemap:   false,
   logLevel:    'info',
+  define:      { __OSH_VERSION__: JSON.stringify(version) },
   plugins: [{
     name: 'dev-reload',
     setup(build) {
