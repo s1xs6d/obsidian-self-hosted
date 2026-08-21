@@ -39,23 +39,29 @@ else
     echo "Latest version: v${LATEST_VERSION}"
 fi
 
-TAR_NAME="obsidian-${LATEST_VERSION}.tar.gz"
-DOWNLOAD_URL="https://github.com/obsidianmd/obsidian-releases/releases/download/v${LATEST_VERSION}/${TAR_NAME}"
-
 if [ -d "$WORK_DIR" ]; then
     rm -rf "$WORK_DIR"
 fi
 mkdir -p "$WORK_DIR"
 cd "$WORK_DIR"
 
-echo "Downloading package..."
-curl -L -O "$DOWNLOAD_URL"
+BASE_URL="https://github.com/obsidianmd/obsidian-releases/releases/download/v${LATEST_VERSION}"
 
-echo "Extracting package..."
-tar -xzf "$TAR_NAME"
+# Every stable release ships the standalone .asar.gz asset (~9 MB); only
+# pre-release tags lack it, and those are not supported here.
+ASAR_GZ_NAME="obsidian-${LATEST_VERSION}.asar.gz"
+ASAR_NAME="obsidian-${LATEST_VERSION}.asar"
 
-EXTRACTED_RESOURCES="obsidian-${LATEST_VERSION}/resources"
-SRC_OBSIDIAN_ASAR="${EXTRACTED_RESOURCES}/obsidian.asar"
+echo "Downloading ${ASAR_GZ_NAME}..."
+if ! curl -f -sSL -o "$ASAR_GZ_NAME" "${BASE_URL}/${ASAR_GZ_NAME}"; then
+    echo "Error: ${ASAR_GZ_NAME} is not published for v${LATEST_VERSION}."
+    exit 1
+fi
+
+echo "Decompressing..."
+gzip -d -c "$ASAR_GZ_NAME" > "$ASAR_NAME"
+
+SRC_OBSIDIAN_ASAR="${ASAR_NAME}"
 
 if [ ! -f "$SRC_OBSIDIAN_ASAR" ]; then
     echo "Error: obsidian.asar missing from package."
