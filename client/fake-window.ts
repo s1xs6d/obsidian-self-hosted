@@ -69,24 +69,25 @@ export const fakeWebContents = {
   },
 };
 
-export function makeWindow() {
+export function makeWindow(doc: Document = document) {
   let _listeners = {};
+  const zoomFactor = () => Number.parseFloat(doc.body.style.zoom) || 1;
   return {
     id: 1,
     setTitle(t) {
-      document.title = t;
+      doc.title = t;
     },
     getTitle() {
-      return document.title;
+      return doc.title;
     },
     minimize() {
       warn("minimize() not supported in browser");
     },
     maximize() {
-      document.documentElement.requestFullscreen?.().catch(() => {});
+      doc.documentElement.requestFullscreen?.().catch(() => {});
     },
     unmaximize() {
-      document.exitFullscreen?.().catch(() => {});
+      doc.exitFullscreen?.().catch(() => {});
     },
     restore() {},
     close() {
@@ -96,22 +97,28 @@ export function makeWindow() {
       globalThis.close();
     },
     isMaximized() {
-      return !!document.fullscreenElement;
+      return !!doc.fullscreenElement;
     },
     isMinimized() {
       return false;
     },
     isFocused() {
-      return document.hasFocus();
+      return doc.hasFocus();
     },
     isDestroyed() {
       return false;
     },
     isFullScreen() {
-      return !!document.fullscreenElement;
+      return !!doc.fullscreenElement;
     },
     setFullScreen(v) {
-      v ? document.documentElement.requestFullscreen?.().catch(() => {}) : document.exitFullscreen?.().catch(() => {});
+      v ? doc.documentElement.requestFullscreen?.().catch(() => {}) : doc.exitFullscreen?.().catch(() => {});
+    },
+    setFrameZoomLevel(level) {
+      doc.body.style.zoom = String(1.2 ** level);
+    },
+    getFrameZoomLevel() {
+      return Math.log(zoomFactor()) / Math.log(1.2);
     },
     isResizable() {
       return true;
@@ -133,21 +140,25 @@ export function makeWindow() {
     focus() {},
     blur() {},
     getBounds() {
-      return { x: 0, y: 0, width: innerWidth, height: innerHeight };
+      const v = doc.defaultView || window;
+      return { x: 0, y: 0, width: v.innerWidth, height: v.innerHeight };
     },
     setBounds(b, a) {
       debugLog("setBounds(" + JSON.stringify(b) + ", " + a + ")");
     },
     getContentBounds() {
-      return { x: 0, y: 0, width: innerWidth, height: innerHeight };
+      const v = doc.defaultView || window;
+      return { x: 0, y: 0, width: v.innerWidth, height: v.innerHeight };
     },
     setContentBounds() {},
     getSize() {
-      return [innerWidth, innerHeight];
+      const v = doc.defaultView || window;
+      return [v.innerWidth, v.innerHeight];
     },
     setSize() {},
     getContentSize() {
-      return [innerWidth, innerHeight];
+      const v = doc.defaultView || window;
+      return [v.innerWidth, v.innerHeight];
     },
     setContentSize() {},
     getPosition() {
@@ -181,9 +192,10 @@ export function makeWindow() {
     on(event, cb) {
       if (!_listeners[event]) _listeners[event] = [];
       _listeners[event].push(cb);
-      if (event === "focus") globalThis.addEventListener("focus", cb);
-      else if (event === "blur") globalThis.addEventListener("blur", cb);
-      else if (event === "resize") globalThis.addEventListener("resize", cb);
+      const target = doc.defaultView || window;
+      if (event === "focus") target.addEventListener("focus", cb);
+      else if (event === "blur") target.addEventListener("blur", cb);
+      else if (event === "resize") target.addEventListener("resize", cb);
       return this;
     },
     once(event, cb) {
@@ -195,9 +207,10 @@ export function makeWindow() {
     },
     removeListener(event, cb) {
       if (_listeners[event]) _listeners[event] = _listeners[event].filter((l) => l !== cb);
-      if (event === "focus") globalThis.removeEventListener("focus", cb);
-      else if (event === "blur") globalThis.removeEventListener("blur", cb);
-      else if (event === "resize") globalThis.removeEventListener("resize", cb);
+      const target = doc.defaultView || window;
+      if (event === "focus") target.removeEventListener("focus", cb);
+      else if (event === "blur") target.removeEventListener("blur", cb);
+      else if (event === "resize") target.removeEventListener("resize", cb);
       return this;
     },
     removeAllListeners(event) {

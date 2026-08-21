@@ -34,6 +34,9 @@ func main() {
 	if err := config.Load(); err != nil {
 		log.Printf("warning: could not load config: %v (starting with empty config)", err)
 	}
+	if err := config.LoadPolicy(); err != nil {
+		log.Printf("warning: could not load policy: %v (using defaults)", err)
+	}
 
 	if v := bundleVersion(*obsidianDir); v != "" {
 		config.SetVersion(v)

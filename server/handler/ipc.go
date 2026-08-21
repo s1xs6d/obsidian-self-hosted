@@ -254,6 +254,26 @@ func DispatchSync(channel string, args []any, vaultID string) (any, error) {
 	case "frame":
 		return "native", nil
 
+	// ---- Obsidian 1.13 additions ---------------------------------------------
+
+	case "policy":
+		// Feature policy consumed by 1.13's starter/app; loaded from the policy
+		// file next to config.json (see config.LoadPolicy).
+		return config.PolicyResponse(), nil
+
+	case "terms":
+		// 1.13 compares the response against this exact license text; a
+		// mismatch makes it close the window, so the app never opens.
+		return "I understand and agree that I am not allowed to distribute the Obsidian application, in any form, without explicit approval from the Obsidian team. I also understand that Obsidian is a registered trademark, and I cannot use it without explicit permission granted by the Obsidian team.", nil
+
+	case "set-language":
+		return nil, nil
+
+	case "is-closing":
+		// True reproduces the pre-1.13 behavior of saving the layout and
+		// showing "Saving..." on unload.
+		return true, nil
+
 	// ---- Paths --------------------------------------------------------------
 
 	case "documents-dir", "get-documents-path":

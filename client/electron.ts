@@ -186,6 +186,11 @@ globalThis.require = (moduleName: string): unknown => {
     case "electron":
       mod = electronShim;
       break;
+    case "@electron/remote":
+      // Obsidian's popout bootstrap (_J) falls back to this when the shim's
+      // electron object lacks `remote`.
+      mod = remote;
+      break;
     case "path":
       mod = pathShim;
       break;

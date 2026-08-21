@@ -141,10 +141,19 @@ globalThis.open = (url, target, features) => {
   const newWin = _origOpen(url, target, features);
   if (newWin && typeof url === "string" && url === "about:blank") {
     try {
-      newWin.electronWindow = makeWindow();
+      newWin.electronWindow = makeWindow(newWin.document);
       newWin.electron = electronShim;
       newWin.require = globalThis.require;
       newWin.ipcRenderer = electronShim.ipcRenderer;
+      // The fake window's close() targets the main window; make it close the
+      // popup itself instead. All other electronWindow methods already act on
+      // the popup document via the makeWindow(newWin.document) argument.
+      newWin.electronWindow.close = () => {
+        try {
+          newWin.close();
+        } catch (_) {}
+      };
+      newWin.document.title = "Obsidian";
     } catch (e) {
       debugLog("popout window shim injection failed: " + e);
     }
