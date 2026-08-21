@@ -344,11 +344,34 @@ import { openTerminal } from "./terminal";
     else showDomToolbarMenu(app, triggerEvt);
   }
 
-  function addRibbonButton(app) {
+  async function addRibbonButton(app) {
     try {
-      app.workspace.leftRibbon.addRibbonItemButton("osh:toolbar-menu", "menu", "Menu", (evt) =>
-        showToolbarMenu(app, evt),
-      );
+      const ribbon = app.workspace.leftRibbon;
+      const ribbonId = "osh:toolbar-menu";
+      // addRibbonItemButton always appends to the end of the ribbon's items
+      // (bottom). Place the button at the position saved in the workspace
+      // layout, defaulting to the top when there is no saved position yet
+      // (first vault open). Reading the layout first avoids a flicker of the
+      // button appearing at the bottom before jumping into place.
+      let savedIndex = 0;
+      try {
+        const raw = await app.vault.adapter.read(app.vault.configDir + "/workspace.json");
+        const layout = JSON.parse(raw);
+        const keys = Object.keys(layout?.["left-ribbon"]?.hiddenItems ?? {});
+        const idx = keys.indexOf(ribbonId);
+        if (idx >= 0) savedIndex = idx;
+      } catch (_) {
+        // Missing/unparseable layout: first open — keep the default (top).
+      }
+      ribbon.addRibbonItemButton(ribbonId, "menu", "Menu", (evt) => showToolbarMenu(app, evt));
+      const idx = ribbon.items.findIndex((it) => it.id === ribbonId);
+      if (idx >= 0 && idx !== savedIndex) {
+        const [item] = ribbon.items.splice(idx, 1);
+        ribbon.items.splice(Math.min(savedIndex, ribbon.items.length), 0, item);
+        // Re-render and persist the new order into the workspace layout
+        // (hiddenItems key order), so later loads respect it.
+        if (typeof ribbon.onChange === "function") ribbon.onChange(true);
+      }
     } catch (e) {
       warn("osh: failed to add ribbon button: " + e);
     }
