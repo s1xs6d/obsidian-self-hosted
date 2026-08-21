@@ -1,7 +1,8 @@
 import { BASE_URL, getVaultId } from "./config";
 import { ipcSendSync } from "./ipc";
-import { warn } from "./log";
 import type { ObsidianMenu } from "./lib/obsidian-types";
+import { warn } from "./log";
+import { buildFromTemplate as buildOshMenu } from "./remote/menu";
 import { openTerminal } from "./terminal";
 
 // Wrap window.eval to intercept every plugin load so we can:
@@ -310,67 +311,26 @@ import { openTerminal } from "./terminal";
   }
 
   function showDomToolbarMenu(app, triggerEvt) {
-    const menuEl = document.createElement("div");
-    menuEl.className = "menu osh-toolbar-menu";
-    buildMenuStructure(app).forEach((section) => {
-      const hdr = document.createElement("div");
-      hdr.className = "menu-item mod-disabled";
-      const hdrIco = document.createElement("div");
-      hdrIco.className = "menu-item-icon";
-      sfbSetIcon(hdrIco, section.icon);
-      const hdrTitle = document.createElement("div");
-      hdrTitle.className = "menu-item-title";
-      hdrTitle.textContent = section.label;
-      hdr.appendChild(hdrIco);
-      hdr.appendChild(hdrTitle);
-      menuEl.appendChild(hdr);
-
-      section.items.forEach((item) => {
-        if (!item) {
-          const sep = document.createElement("div");
-          sep.className = "menu-separator";
-          menuEl.appendChild(sep);
-          return;
-        }
-        const el = document.createElement("div");
-        el.className = "menu-item";
-        const ico = document.createElement("div");
-        ico.className = "menu-item-icon";
-        sfbSetIcon(ico, item.icon);
-        const title = document.createElement("div");
-        title.className = "menu-item-title";
-        title.textContent = item.label;
-        el.appendChild(ico);
-        el.appendChild(title);
-        const cmd = item.cmd;
-        el.addEventListener("mousedown", (e) => {
-          e.preventDefault();
-          menuEl.remove();
-          try {
-            app.commands.executeCommandById(cmd);
-          } catch (_) {}
-        });
-        menuEl.appendChild(el);
-      });
-      const sep = document.createElement("div");
-      sep.className = "menu-separator";
-      menuEl.appendChild(sep);
-    });
-
-    document.body.appendChild(menuEl);
-    const mw = menuEl.offsetWidth || 220;
-    const mh = menuEl.offsetHeight || 300;
-    menuEl.style.left = Math.min(triggerEvt.clientX, innerWidth - mw - 4) + "px";
-    menuEl.style.top = Math.min(triggerEvt.clientY, innerHeight - mh - 4) + "px";
-    setTimeout(() => {
-      const dismiss = (e) => {
-        if (!menuEl.contains(e.target)) {
-          menuEl.remove();
-          document.removeEventListener("mousedown", dismiss, true);
-        }
-      };
-      document.addEventListener("mousedown", dismiss, true);
-    }, 0);
+    // Fallback used when the Obsidian public API couldn't be captured (e.g. no
+    // community plugins enabled). Our own menu implementation provides the
+    // same behavior the native menu would: hover highlighting, a scrollable
+    // container, submenus, and viewport clamping.
+    const template = buildMenuStructure(app).map((section) => ({
+      label: section.label,
+      submenu: section.items.map((si) => {
+        if (!si) return { type: "separator" as const };
+        return {
+          label: si.label,
+          click: () => {
+            try {
+              app.commands.executeCommandById(si.cmd);
+            } catch (_) {}
+          },
+        };
+      }),
+    }));
+    const menu = buildOshMenu(template);
+    menu.popup({ x: triggerEvt.clientX, y: triggerEvt.clientY });
   }
 
   function showToolbarMenu(app, triggerEvt) {
