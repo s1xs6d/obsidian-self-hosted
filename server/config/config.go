@@ -12,7 +12,19 @@ import (
 	"time"
 )
 
-const Version = "1.12.7"
+// Version is the Obsidian bundle version reported to the renderer. It is
+// overridden at startup from the served bundle's package.json when available;
+// 0.0.0 is the "unknown" placeholder for when that read fails.
+var Version = "0.0.0"
+
+// SetVersion overrides the bundle version reported to the renderer. Empty
+// values are ignored, keeping the previous value.
+func SetVersion(v string) {
+	if v == "" {
+		return
+	}
+	Version = v
+}
 
 // VaultEntry holds the metadata for a single registered vault.
 type VaultEntry struct {

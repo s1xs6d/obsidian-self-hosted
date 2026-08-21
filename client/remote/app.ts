@@ -2,8 +2,10 @@ import { ipcSendSync } from "../ipc";
 import { debugLog } from "../log";
 
 export const app = {
-  getVersion() {
-    return "1.12.7";
+getVersion() {
+    // The server reads the version from the served bundle's package.json at
+    // startup, so this always matches the actual Obsidian build.
+    return (ipcSendSync("version") as string) || "0.0.0";
   },
   getName() {
     return "Obsidian";

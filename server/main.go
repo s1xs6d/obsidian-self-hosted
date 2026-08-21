@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"log"
 	"os"
@@ -32,6 +33,11 @@ func main() {
 
 	if err := config.Load(); err != nil {
 		log.Printf("warning: could not load config: %v (starting with empty config)", err)
+	}
+
+	if v := bundleVersion(*obsidianDir); v != "" {
+		config.SetVersion(v)
+		log.Printf("Obsidian bundle version: %s", v)
 	}
 
 	oshToken := os.Getenv("OSH_TOKEN")
@@ -74,6 +80,23 @@ func executableDir() string {
 		return wd
 	}
 	return filepath.Dir(exe)
+}
+
+// bundleVersion reads the "version" field from the Obsidian bundle's
+// package.json (e.g. <obsidian-dir>/package.json). Returns "" when the file
+// is missing or unparseable.
+func bundleVersion(obsidianDir string) string {
+	data, err := os.ReadFile(filepath.Join(obsidianDir, "package.json"))
+	if err != nil {
+		return ""
+	}
+	var pkg struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return ""
+	}
+	return pkg.Version
 }
 
 func envOr(key, fallback string) string {
