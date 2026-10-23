@@ -240,6 +240,11 @@ func DispatchSync(channel string, args []any, vaultID string) (any, error) {
 	case "version":
 		return config.Version, nil
 
+	case "latest-public-version":
+		// Obsidian 1.14+ asks for the latest published version to decide whether
+		// to show an update prompt. The served bundle already is that version.
+		return config.Version, nil
+
 	case "is-dev":
 		return false, nil
 

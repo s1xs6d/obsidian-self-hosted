@@ -20,6 +20,10 @@ getVersion() {
   getLocale() {
     return (navigator.language || "en-US").split("-")[0];
   },
+  getPreferredSystemLanguages() {
+    const languages = navigator.languages?.length ? navigator.languages : [navigator.language || "en-US"];
+    return Array.from(languages);
+  },
   getLocaleCountryCode() {
     return (navigator.language || "en-US").split("-")[1] || "US";
   },

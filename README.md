@@ -52,6 +52,23 @@ Open `http://your-server:27123` and sign in with the password you set.
 
 Without the `osh-home` volume, the container runs as root with an ephemeral `/root`: OSH's vault registry, saved secrets, and anything written to `~/.gitconfig` / `~/.git-credentials` (e.g. via the terminal, if `OSH_TERMINAL=true`) all disappear the next time the container is recreated (`docker compose up` after a `down` or image update — not a plain restart).
 
+## Opening files outside the vault
+
+Obsidian 1.14 added an "Open file from outside the vault…" command. In OSH this
+opens the browser file picker instead of a native dialog. The selected file's
+parent directory is registered with the server so Obsidian can read and write
+that file (and sibling files it links to or embeds).
+
+- Only paths below `OSH_HOME` can be opened. In Docker, `OSH_HOME` is `/vault`,
+  so the mounted vaults directory must contain any external files you want to
+  open. Mount a common parent directory if you need `../notes`-style files.
+- The allowlist is in memory and is cleared when the server restarts; reopen the
+  file through the command after a restart.
+- Symlinks are resolved before authorization, so a link inside an allowed
+  directory cannot be used to escape `OSH_HOME`.
+- File watching is not available for external files. Changes made outside
+  Obsidian are not auto-refreshed; reopen the file to pick them up.
+
 ## Code Structure
 
 - `client/` — TypeScript shim loaded into the Obsidian bundle in place of Electron

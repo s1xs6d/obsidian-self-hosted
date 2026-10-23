@@ -64,6 +64,12 @@ func isAllowedPathForVault(path string, vaultID string) bool {
 			return true
 		}
 	}
+
+	// Files explicitly opened from outside the vault (Obsidian 1.14+).
+	if isAllowedExternalPath(path) {
+		return true
+	}
+
 	return false
 }
 
@@ -186,10 +192,10 @@ func FsReaddir(c *gin.Context) {
 		dirents := make([]map[string]any, 0, len(entries))
 		for _, e := range entries {
 			dirents = append(dirents, map[string]any{
-				"name":            e.Name(),
-				"isFile":          e.Type().IsRegular(),
-				"isDirectory":     e.IsDir(),
-				"isSymbolicLink":  e.Type()&os.ModeSymlink != 0,
+				"name":           e.Name(),
+				"isFile":         e.Type().IsRegular(),
+				"isDirectory":    e.IsDir(),
+				"isSymbolicLink": e.Type()&os.ModeSymlink != 0,
 			})
 		}
 		c.JSON(http.StatusOK, map[string]any{"entries": dirents})

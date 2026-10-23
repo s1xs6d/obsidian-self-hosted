@@ -58,6 +58,7 @@ func (h *StaticHandler) GetShim(c *gin.Context) {
 		return
 	}
 	defer f.Close()
+	setScriptHeaders(c)
 	c.Header("Content-Type", "application/javascript; charset=utf-8")
 	http.ServeContent(c.Writer, c.Request, "electron-shim.js", info.ModTime(), f)
 }
@@ -144,6 +145,11 @@ func (h *StaticHandler) ServeObsidianFile(c *gin.Context) {
 	}
 	defer f.Close()
 
+	if strings.EqualFold(filepath.Ext(fullPath), ".js") {
+		setScriptHeaders(c)
+	} else {
+		setResourceHeaders(c)
+	}
 	if ct := mime.TypeByExtension(filepath.Ext(fullPath)); ct != "" {
 		c.Header("Content-Type", ct)
 	}
@@ -169,6 +175,21 @@ func (h *StaticHandler) serveObsidianHTML(c *gin.Context, filename string) {
 	_, _ = c.Writer.Write(data)
 }
 
+// setResourceHeaders marks a static asset as same-origin. The app pages send
+// COEP: require-corp, and Chrome blocks worker scripts (e.g. worker.js) when
+// the response has no explicit Cross-Origin-Resource-Policy header.
+func setResourceHeaders(c *gin.Context) {
+	c.Header("Cross-Origin-Resource-Policy", "same-origin")
+}
+
+// setScriptHeaders is used for JavaScript responses. Under COEP: require-corp,
+// Chrome refuses to start a dedicated worker whose script response lacks its
+// own Cross-Origin-Embedder-Policy header (ERR_BLOCKED_BY_RESPONSE).
+func setScriptHeaders(c *gin.Context) {
+	setResourceHeaders(c)
+	c.Header("Cross-Origin-Embedder-Policy", "require-corp")
+}
+
 func setSecurityHeaders(c *gin.Context) {
 	host := c.Request.Host
 	isSecure := c.Request.TLS != nil ||
@@ -180,6 +201,7 @@ func setSecurityHeaders(c *gin.Context) {
 		c.Header("Cross-Origin-Opener-Policy", "same-origin")
 		c.Header("Cross-Origin-Embedder-Policy", "require-corp")
 	}
+	setResourceHeaders(c)
 	c.Header("Access-Control-Allow-Origin", "*")
 }
 
@@ -196,6 +218,11 @@ func (h *StaticHandler) serveLocalFile(c *gin.Context, absPath string, info os.F
 		return
 	}
 	defer f.Close()
+	if strings.EqualFold(filepath.Ext(absPath), ".js") {
+		setScriptHeaders(c)
+	} else {
+		setResourceHeaders(c)
+	}
 	if ct := mime.TypeByExtension(filepath.Ext(absPath)); ct != "" {
 		c.Header("Content-Type", ct)
 	}
@@ -242,6 +269,11 @@ func VaultFiles(c *gin.Context) {
 	}
 	defer f.Close()
 
+	if strings.EqualFold(filepath.Ext(fullPath), ".js") {
+		setScriptHeaders(c)
+	} else {
+		setResourceHeaders(c)
+	}
 	http.ServeContent(c.Writer, c.Request, filepath.Base(fullPath), info.ModTime(), f)
 }
 

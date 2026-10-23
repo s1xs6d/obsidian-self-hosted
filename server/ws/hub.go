@@ -136,6 +136,12 @@ func (h *WSHub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 						"id":     req.ID,
 						"result": result,
 					})
+				} else {
+					client.enqueue(map[string]any{
+						"type":  "error",
+						"id":    req.ID,
+						"error": err.Error(),
+					})
 				}
 			} else if req.Type == "invoke-async" {
 				handler.DispatchAsync(req.Channel, req.Args, vault)

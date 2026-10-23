@@ -1,4 +1,5 @@
 import { BASE_URL, getVaultId, setVaultId, vaultQuery } from "./config";
+import { OshFileBrowser } from "./file-browser";
 import { bus } from "./lib/service-bus";
 import { debugLog, warn } from "./log";
 import { syncXhr } from "./sync-xhr";
@@ -292,8 +293,45 @@ function _handleRequestUrl(replyChannel: string, opts: Record<string, unknown> =
     .catch((e) => ipcDispatch(replyChannel, { sender: ipcRenderer }, { error: String(e?.message || e) }));
 }
 
+// Obsidian 1.14+ sends `open-file` from the "Open file from outside the
+// vault…" command. The desktop main process shows a native dialog and then
+// calls window.OBS_OPEN_FILE(path). In the browser we show the OSH file
+// picker instead, register the selected file's directory with the server, and
+// hand the absolute path to Obsidian's own external-file handler.
+function _openExternalFile(extensions: unknown): void {
+  const exts = Array.isArray(extensions) ? extensions.filter((e): e is string => typeof e === "string") : [];
+  const filters = exts.length ? [{ name: "Supported files", extensions: exts }] : null;
+
+  new OshFileBrowser({
+    mode: "select",
+    selectMode: "file",
+    title: "Open file from outside the vault",
+    filters,
+    onSelect: (selectedPath) => {
+      const allowed = syncXhr("POST", `${BASE_URL}/api/external/allow${vaultQuery()}`, {
+        path: selectedPath,
+      });
+      if (!allowed || allowed.error || allowed.ok === false) {
+        warn("open-file: could not allow " + selectedPath + ": " + (allowed?.error || "unknown error"));
+        return;
+      }
+
+      const openFile = (window as unknown as { OBS_OPEN_FILE?: (path: string) => void }).OBS_OPEN_FILE;
+      if (typeof openFile !== "function") {
+        warn("open-file: OBS_OPEN_FILE is not ready");
+        return;
+      }
+      openFile(selectedPath);
+    },
+  }).open();
+}
+
 function ipcSend(channel: string, ...args: unknown[]): void {
   debugLog("ipcSend: " + channel);
+  if (channel === "open-file") {
+    _openExternalFile(args[0]);
+    return;
+  }
   if (channel === "set-icon") {
     const [fileName, data] = args;
     const hasData = !!(fileName && data);

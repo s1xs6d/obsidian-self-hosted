@@ -63,6 +63,9 @@ func RegisterRoutes(r *gin.Engine, staticHandler *StaticHandler, hub http.Handle
 	r.POST("/api/native/show-item", NativeStub)
 	r.POST("/api/native/open-path", NativeStub)
 
+	// ---- External files opened from outside a vault (Obsidian 1.14+) ----
+	r.POST("/api/external/allow", ExternalAllow)
+
 	// ---- Vault file serving ----
 	r.GET("/vault-files/*path", VaultFiles)
 
